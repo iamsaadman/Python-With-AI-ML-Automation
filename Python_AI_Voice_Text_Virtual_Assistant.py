@@ -4,7 +4,15 @@ from datetime import datetime
 from io import BytesIO
 
 import streamlit as st
-from gtts import gTTS
+
+# Safe import for gTTS
+try:
+    from gtts import gTTS
+    GTTS_AVAILABLE = True
+except ModuleNotFoundError:
+    GTTS_AVAILABLE = False
+    print("Warning: gTTS not installed, audio will not work.")
+
 
 HELP_TEXT = (
     "You can ask me about the time or the date, tell me to calculate something "
@@ -17,15 +25,21 @@ HELP_TEXT = (
 # ---------- SPEAK ----------
 def speak(text: str) -> None:
     st.session_state.chat.append(("Assistant", text))
-    # generate MP3 in memory instead of writing a temp file
-    tts = gTTS(text=text, lang="en")
-    mp3_buf = BytesIO()
-    tts.write_to_fp(mp3_buf)
-    mp3_buf.seek(0)
-    st.session_state.last_audio = base64.b64encode(mp3_buf.read()).decode()
+    if GTTS_AVAILABLE:
+        try:
+            tts = gTTS(text=text, lang="en")
+            mp3_buf = BytesIO()
+            tts.write_to_fp(mp3_buf)
+            mp3_buf.seek(0)
+            st.session_state.last_audio = base64.b64encode(mp3_buf.read()).decode()
+        except Exception as e:
+            print("gTTS audio error:", e)
+            st.session_state.last_audio = None
+    else:
+        st.session_state.last_audio = None
 
 
-# ---------- FEATURES ---------- (unchanged) ...
+# ---------- FEATURES ----------
 def tell_time() -> None:
     speak(f"The current time is {datetime.now():%H:%M:%S}.")
 
@@ -46,6 +60,7 @@ def tell_joke() -> None:
 def calculate(user_input: str) -> None:
     expr = user_input.partition("calculate")[2].strip()
     try:
+        # Safe eval without builtins
         result = eval(expr, {"__builtins__": None}, {})
         speak(f"The result is {result}.")
     except Exception:
@@ -64,7 +79,7 @@ def open_website(user_input: str) -> None:
     st.session_state.last_link = url
 
 
-# ---------- QUERY HANDLER ---------- (unchanged) ...
+# ---------- QUERY HANDLER ----------
 def handle_query(user_input: str) -> bool:
     if user_input == "exit":
         speak("Goodbye! Have a great day!")
