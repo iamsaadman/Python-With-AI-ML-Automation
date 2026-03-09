@@ -1,9 +1,8 @@
-import os
 import random
 import base64
-import tempfile
 from pathlib import Path
 from datetime import datetime
+from io import BytesIO
 
 import streamlit as st
 from gtts import gTTS
@@ -16,28 +15,15 @@ HELP_TEXT = (
 )
 
 
-# ---------- AUDIO AUTOPLAY ----------
-def autoplay_audio(file_path: str) -> None:
-    """Embed a short auto‑playing audio clip via base64 HTML."""
-    with open(file_path, "rb") as f:
-        data = f.read()
-
-    b64 = base64.b64encode(data).decode()
-    audio_html = f"""
-    <audio autoplay>
-        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-    </audio>
-    """
-    st.markdown(audio_html, unsafe_allow_html=True)
-
-
 # ---------- SPEAK ----------
 def speak(text: str) -> None:
     st.session_state.chat.append(("Assistant", text))
+    # generate MP3 in memory instead of writing a temp file
     tts = gTTS(text=text, lang="en")
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    tts.save(tmp.name)
-    st.session_state.last_audio = tmp.name
+    mp3_buf = BytesIO()
+    tts.write_to_fp(mp3_buf)
+    mp3_buf.seek(0)
+    st.session_state.last_audio = base64.b64encode(mp3_buf.read()).decode()
 
 
 # ---------- FEATURES ----------
@@ -61,7 +47,6 @@ def tell_joke() -> None:
 def calculate(user_input: str) -> None:
     expr = user_input.partition("calculate")[2].strip()
     try:
-        # restrict eval for safety
         result = eval(expr, {"__builtins__": None}, {})
         speak(f"The result is {result}.")
     except Exception:
@@ -135,8 +120,10 @@ def main() -> None:
     if image_path.exists():
         st.image(str(image_path), width=150)
     else:
-        st.info("Developer image not found – place Developer.jpg in the "
-                "`images` folder next to this script.")
+        st.info(
+            "Developer image not found – place Developer.jpg in the "
+            "`images` folder next to this script."
+        )
 
     st.write(HELP_TEXT)
 
@@ -155,9 +142,15 @@ def main() -> None:
             if not cont:
                 st.session_state.chat.append(("Assistant", "Session ended."))
 
-    # play audio if generated
-    if st.session_state.last_audio and os.path.exists(st.session_state.last_audio):
-        autoplay_audio(st.session_state.last_audio)
+    # autoplay audio if one was generated
+    if st.session_state.last_audio:
+        audio_html = f"""
+        <audio autoplay>
+            <source src="data:audio/mp3;base64,{st.session_state.last_audio}"
+                    type="audio/mp3">
+        </audio>
+        """
+        st.markdown(audio_html, unsafe_allow_html=True)
 
     # show link if one was generated
     if st.session_state.last_link:
