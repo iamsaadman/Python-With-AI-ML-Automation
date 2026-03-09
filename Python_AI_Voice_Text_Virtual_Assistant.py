@@ -54,7 +54,7 @@ def speak(text: str):
             tts = gTTS(text=text, lang="en")
             audio_buf = BytesIO()
             tts.write_to_fp(audio_buf)
-            st.session_state.last_audio = audio_buf.getvalue()
+            st.session_state.last_audio = audio_buf.getvalue()  # store as bytes
         except Exception as e:
             print("gTTS error:", e)
             st.session_state.last_audio = None
@@ -134,103 +134,31 @@ def main():
 
     # Theme
     theme = st.sidebar.radio("Select Theme", ["Light", "Dark"])
-
     if theme == "Dark":
-        bg = "#111111"
-        fg = "#f0f0f0"
-        sidebar_bg = "#1a1a1a"
-        chat_bg = "#1e1e1e"
-        chat_border = "#333333"
-        input_bg = "#2a2a2a"
-        input_border = "#444444"
-        btn_bg = "#2a2a2a"
-        btn_border = "#555555"
+        st.markdown("<style>body{background-color:#111;color:white}</style>", unsafe_allow_html=True)
     else:
-        bg = "#ffffff"
-        fg = "#111111"
-        sidebar_bg = "#f5f5f5"
-        chat_bg = "#f9f9f9"
-        chat_border = "#dddddd"
-        input_bg = "#ffffff"
-        input_border = "#cccccc"
-        btn_bg = "#f0f0f0"
-        btn_border = "#cccccc"
-
-    st.markdown(f"""
-    <style>
-    html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"],
-    [data-testid="block-container"], section.main {{
-        background-color: {bg} !important;
-        color: {fg} !important;
-    }}
-    [data-testid="stSidebar"] {{
-        background-color: {sidebar_bg} !important;
-    }}
-    [data-testid="stSidebar"] * {{
-        color: {fg} !important;
-    }}
-    h1, h2, h3, h4, h5, h6 {{
-        color: {fg} !important;
-    }}
-    p, span, div, label {{
-        color: {fg} !important;
-    }}
-    .stMarkdown p, .stMarkdown li, .stMarkdown span {{
-        color: {fg} !important;
-    }}
-    .chat-box {{
-        background-color: {chat_bg} !important;
-        border: 1px solid {chat_border} !important;
-        border-radius: 10px;
-        padding: 16px;
-        height: 220px;
-        overflow-y: auto;
-        margin-bottom: 12px;
-    }}
-    .chat-box p, .chat-box strong {{
-        color: {fg} !important;
-    }}
-    .stTextInput input {{
-        background-color: {input_bg} !important;
-        color: {fg} !important;
-        border: 1px solid {input_border} !important;
-    }}
-    .stButton > button, .stFormSubmitButton > button {{
-        background-color: {btn_bg} !important;
-        color: {fg} !important;
-        border: 1px solid {btn_border} !important;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+        st.markdown("<style>body{background-color:white;color:black}</style>", unsafe_allow_html=True)
 
     st.title("Azile – Virtual Assistant - Developed by Saadman Sakib")
     st.markdown("### Introduction")
     st.markdown(HELP_TEXT)
-
-    # ---------- CHAT HISTORY (above input) ----------
-    chat_html = f'<div class="chat-box" id="chat-box">'
-    if not st.session_state.chat:
-        chat_html += f'<p style="color:#aaa; text-align:center; margin-top:80px;">Your conversation will appear here.</p>'
-    else:
-        for who, msg in st.session_state.chat:
-            chat_html += f'<p><strong>{who}:</strong> {msg}</p>'
-    chat_html += '</div>'
-    chat_html += '<script>var cb=document.getElementById("chat-box");if(cb)cb.scrollTop=cb.scrollHeight;</script>'
-    st.markdown(chat_html, unsafe_allow_html=True)
 
     # ---------- USER INPUT FORM ----------
     with st.form("chat_form", clear_on_submit=True):
         user_input = st.text_input("You:")
         send = st.form_submit_button("Send")
         if send and user_input.strip():
-            st.session_state.last_audio = None
+            st.session_state.last_audio = None  # reset before new response
             st.session_state.chat.append(("You", user_input.strip()))
             cont = handle_query(user_input.strip())
             if not cont:
                 st.session_state.chat.append(("Assistant", "Session ended."))
-            st.rerun()
 
-    # Auto-play audio
+    # Render chat history
+    for who, msg in st.session_state.chat:
+        st.markdown(f"**{who}:** {msg}")
+
+    # Auto-play audio — outside form, always re-rendered after state update
     if st.session_state.last_audio:
         autoplay_audio(st.session_state.last_audio)
         st.session_state.last_audio = None
