@@ -4,7 +4,8 @@ from io import BytesIO
 import base64
 import streamlit as st
 
-# Safe import for gTTS
+st.set_page_config(page_title="Azile – Virtual Assistant", page_icon="🤖", layout="centered")
+
 try:
     from gtts import gTTS
     GTTS_AVAILABLE = True
@@ -12,7 +13,6 @@ except ModuleNotFoundError:
     GTTS_AVAILABLE = False
     print("Warning: gTTS not installed, audio will not work.")
 
-# Optional: geolocation for country
 try:
     import geocoder
 except ModuleNotFoundError:
@@ -31,20 +31,15 @@ HELP_TEXT = (
 def autoplay_audio(audio_bytes: bytes):
     b64 = base64.b64encode(audio_bytes).decode()
     unique_id = random.randint(100000, 999999)
-    html = f"""
+    st.components.v1.html(f"""
         <audio id="azile_audio_{unique_id}" autoplay>
             <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
         </audio>
         <script>
             var audio = document.getElementById("azile_audio_{unique_id}");
-            if (audio) {{
-                audio.play().catch(function(e) {{
-                    console.log("Autoplay blocked:", e);
-                }});
-            }}
+            if (audio) audio.play().catch(function(e) {{ console.log("Autoplay blocked:", e); }});
         </script>
-    """
-    st.components.v1.html(html, height=0)
+    """, height=0)
 
 # ---------- SPEAK ----------
 def speak(text: str):
@@ -54,7 +49,7 @@ def speak(text: str):
             tts = gTTS(text=text, lang="en")
             audio_buf = BytesIO()
             tts.write_to_fp(audio_buf)
-            st.session_state.last_audio = audio_buf.getvalue()  # store as bytes
+            st.session_state.last_audio = audio_buf.getvalue()
         except Exception as e:
             print("gTTS error:", e)
             st.session_state.last_audio = None
@@ -132,33 +127,113 @@ def main():
     if "last_audio" not in st.session_state:
         st.session_state.last_audio = None
 
-    # Theme
     theme = st.sidebar.radio("Select Theme", ["Light", "Dark"])
-    if theme == "Dark":
-        st.markdown("<style>body{background-color:#111;color:white}</style>", unsafe_allow_html=True)
-    else:
-        st.markdown("<style>body{background-color:white;color:black}</style>", unsafe_allow_html=True)
+    is_dark = theme == "Dark"
+
+    # All colors driven by theme
+    bg          = "#111111" if is_dark else "#ffffff"
+    fg          = "#f0f0f0" if is_dark else "#111111"
+    sidebar_bg  = "#1a1a1a" if is_dark else "#f5f5f5"
+    chat_bg     = "#1e1e1e" if is_dark else "#f9f9f9"
+    chat_border = "#333333" if is_dark else "#dddddd"
+    input_bg    = "#2a2a2a" if is_dark else "#ffffff"
+    input_fg    = "#f0f0f0" if is_dark else "#111111"
+    input_bdr   = "#555555" if is_dark else "#cccccc"
+    btn_bg      = "#333333" if is_dark else "#eeeeee"
+    btn_fg      = "#f0f0f0" if is_dark else "#111111"
+    btn_bdr     = "#555555" if is_dark else "#cccccc"
+
+    st.markdown(f"""
+    <style>
+    /* ── Page & main area ── */
+    html, body {{ background-color: {bg} !important; color: {fg} !important; }}
+    [data-testid="stAppViewContainer"] {{ background-color: {bg} !important; }}
+    [data-testid="stMain"] {{ background-color: {bg} !important; }}
+    [data-testid="block-container"] {{ background-color: {bg} !important; }}
+    section.main > div {{ background-color: {bg} !important; }}
+
+    /* ── All text ── */
+    [data-testid="stMain"] h1,
+    [data-testid="stMain"] h2,
+    [data-testid="stMain"] h3,
+    [data-testid="stMain"] p,
+    [data-testid="stMain"] span,
+    [data-testid="stMain"] label,
+    [data-testid="stMain"] div,
+    [data-testid="stMain"] li,
+    .stMarkdown, .stMarkdown * {{ color: {fg} !important; }}
+
+    /* ── Sidebar ── */
+    [data-testid="stSidebar"] {{ background-color: {sidebar_bg} !important; }}
+    [data-testid="stSidebar"] * {{ color: {fg} !important; background-color: transparent !important; }}
+
+    /* ── Chat box ── */
+    .chat-box {{
+        background-color: {chat_bg} !important;
+        border: 1px solid {chat_border} !important;
+        border-radius: 10px;
+        padding: 16px;
+        height: 220px;
+        overflow-y: auto;
+        margin-bottom: 12px;
+    }}
+    .chat-box p, .chat-box strong {{ color: {fg} !important; }}
+
+    /* ── Text input ── */
+    .stTextInput input {{
+        background-color: {input_bg} !important;
+        color: {input_fg} !important;
+        border: 1px solid {input_bdr} !important;
+        border-radius: 6px !important;
+    }}
+    .stTextInput label {{ color: {fg} !important; }}
+
+    /* ── Buttons ── */
+    .stButton > button,
+    .stFormSubmitButton > button {{
+        background-color: {btn_bg} !important;
+        color: {btn_fg} !important;
+        border: 1px solid {btn_bdr} !important;
+        border-radius: 6px !important;
+    }}
+    .stButton > button:hover,
+    .stFormSubmitButton > button:hover {{
+        opacity: 0.85 !important;
+    }}
+
+    /* ── Radio buttons in sidebar ── */
+    [data-testid="stSidebar"] .stRadio label {{ color: {fg} !important; }}
+    </style>
+    """, unsafe_allow_html=True)
 
     st.title("Azile – Virtual Assistant - Developed by Saadman Sakib")
     st.markdown("### Introduction")
     st.markdown(HELP_TEXT)
+
+    # ---------- CHAT HISTORY (above input) ----------
+    chat_html = f'<div class="chat-box" id="chat-box">'
+    if not st.session_state.chat:
+        chat_html += f'<p style="color:#888; text-align:center; margin-top:75px;">Your conversation will appear here.</p>'
+    else:
+        for who, msg in st.session_state.chat:
+            chat_html += f'<p><strong>{who}:</strong> {msg}</p>'
+    chat_html += '</div>'
+    chat_html += '<script>var cb=document.getElementById("chat-box");if(cb)cb.scrollTop=cb.scrollHeight;</script>'
+    st.markdown(chat_html, unsafe_allow_html=True)
 
     # ---------- USER INPUT FORM ----------
     with st.form("chat_form", clear_on_submit=True):
         user_input = st.text_input("You:")
         send = st.form_submit_button("Send")
         if send and user_input.strip():
-            st.session_state.last_audio = None  # reset before new response
+            st.session_state.last_audio = None
             st.session_state.chat.append(("You", user_input.strip()))
             cont = handle_query(user_input.strip())
             if not cont:
                 st.session_state.chat.append(("Assistant", "Session ended."))
+            st.rerun()
 
-    # Render chat history
-    for who, msg in st.session_state.chat:
-        st.markdown(f"**{who}:** {msg}")
-
-    # Auto-play audio — outside form, always re-rendered after state update
+    # Auto-play audio
     if st.session_state.last_audio:
         autoplay_audio(st.session_state.last_audio)
         st.session_state.last_audio = None
