@@ -1,10 +1,12 @@
-import streamlit as st
-from datetime import datetime
-import random
-from gtts import gTTS
-import tempfile
-import base64
 import os
+import random
+import base64
+import tempfile
+from pathlib import Path
+from datetime import datetime
+
+import streamlit as st
+from gtts import gTTS
 
 HELP_TEXT = (
     "You can ask me about the time or the date, tell me to calculate something "
@@ -15,18 +17,17 @@ HELP_TEXT = (
 
 
 # ---------- AUDIO AUTOPLAY ----------
-def autoplay_audio(file_path):
+def autoplay_audio(file_path: str) -> None:
+    """Embed a short auto‑playing audio clip via base64 HTML."""
     with open(file_path, "rb") as f:
         data = f.read()
 
     b64 = base64.b64encode(data).decode()
-
     audio_html = f"""
     <audio autoplay>
         <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
     </audio>
     """
-
     st.markdown(audio_html, unsafe_allow_html=True)
 
 
@@ -60,7 +61,8 @@ def tell_joke() -> None:
 def calculate(user_input: str) -> None:
     expr = user_input.partition("calculate")[2].strip()
     try:
-        result = eval(expr)
+        # restrict eval for safety
+        result = eval(expr, {"__builtins__": None}, {})
         speak(f"The result is {result}.")
     except Exception:
         speak("Sorry, I couldn't calculate that.")
@@ -117,7 +119,7 @@ def handle_query(user_input: str) -> bool:
 
 # ---------- MAIN APP ----------
 def main() -> None:
-    # Initialize session state
+    # initialise session state
     if "chat" not in st.session_state:
         st.session_state.chat = []
     if "last_audio" not in st.session_state:
@@ -126,14 +128,23 @@ def main() -> None:
         st.session_state.last_link = None
 
     st.title("Azile – Virtual Assistant - Developed by Saadman Sakib")
-    st.image("./images/Developer.jpg", width=150)
+
+    # resolve the developer image relative to this file
+    base_dir = Path(__file__).resolve().parent
+    image_path = base_dir / "images" / "Developer.jpg"
+    if image_path.exists():
+        st.image(str(image_path), width=150)
+    else:
+        st.info("Developer image not found – place Developer.jpg in the "
+                "`images` folder next to this script.")
+
     st.write(HELP_TEXT)
 
-    # Display past conversation
+    # display past conversation
     for who, msg in st.session_state.chat:
         st.markdown(f"**{who}:** {msg}")
 
-    # --------- USER INPUT FORM ---------
+    # user input form
     with st.form("chat_form", clear_on_submit=True):
         user_input = st.text_input("You:")
         send = st.form_submit_button("Send")
@@ -144,15 +155,15 @@ def main() -> None:
             if not cont:
                 st.session_state.chat.append(("Assistant", "Session ended."))
 
-    # ---------- PLAY AUDIO ----------
+    # play audio if generated
     if st.session_state.last_audio and os.path.exists(st.session_state.last_audio):
         autoplay_audio(st.session_state.last_audio)
 
-    # ---------- SHOW LINK ----------
+    # show link if one was generated
     if st.session_state.last_link:
         st.markdown(f"[Open this link]({st.session_state.last_link})")
 
-    # ---------- CLEAR CHAT ----------
+    # clear history button
     if st.button("Clear history"):
         st.session_state.chat = []
         st.session_state.last_audio = None
