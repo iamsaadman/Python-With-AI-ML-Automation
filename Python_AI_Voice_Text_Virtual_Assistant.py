@@ -1,6 +1,5 @@
 import random
 import base64
-from pathlib import Path
 from datetime import datetime
 from io import BytesIO
 
@@ -26,7 +25,7 @@ def speak(text: str) -> None:
     st.session_state.last_audio = base64.b64encode(mp3_buf.read()).decode()
 
 
-# ---------- FEATURES ----------
+# ---------- FEATURES ---------- (unchanged) ...
 def tell_time() -> None:
     speak(f"The current time is {datetime.now():%H:%M:%S}.")
 
@@ -65,7 +64,7 @@ def open_website(user_input: str) -> None:
     st.session_state.last_link = url
 
 
-# ---------- QUERY HANDLER ----------
+# ---------- QUERY HANDLER ---------- (unchanged) ...
 def handle_query(user_input: str) -> bool:
     if user_input == "exit":
         speak("Goodbye! Have a great day!")
@@ -114,16 +113,13 @@ def main() -> None:
 
     st.title("Azile – Virtual Assistant - Developed by Saadman Sakib")
 
-    # resolve the developer image relative to this file
-    base_dir = Path(__file__).resolve().parent
-    image_path = base_dir / "images" / "Developer.jpg"
-    if image_path.exists():
-        st.image(str(image_path), width=150)
-    else:
-        st.info(
-            "Developer image not found – place Developer.jpg in the "
-            "`images` folder next to this script."
-        )
+    # simple animated banner using emojis
+    st.markdown(
+        "<marquee behavior='alternate' scrollamount='8' style='font-size:24px;'>"
+        "🤖💬 Azile is ready to chat! 🎉✨"
+        "</marquee>",
+        unsafe_allow_html=True,
+    )
 
     st.write(HELP_TEXT)
 
